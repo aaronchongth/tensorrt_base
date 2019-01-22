@@ -138,7 +138,7 @@ TensorRTModule::TensorRTModule(std::string model_path)
 
 TensorRTModule::~TensorRTModule() {
   cudaStreamDestroy(stream_);
-  std::cout << "TensorRT module killed safely." << std::endl;
+  std::cout << "<STATUS> TensorRT module killed safely." << std::endl;
 }
 
 bool TensorRTModule::inference(const std::vector<std::vector<float>>& input) {
@@ -189,10 +189,6 @@ void TensorRTModule::save_engine(std::string engine_path) {
   ofs.close();
   std::cout << "<STATUS> TensorRT engine saved at path " << engine_path
             << std::endl;
-}
-
-void TensorRTModule::load_engine() {
-  std::cout << "<STATUS> TensorRT engine loading done." << std::endl;
 }
 
 void print_dims(nvinfer1::Dims dimensions) {

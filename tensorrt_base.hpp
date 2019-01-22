@@ -18,10 +18,6 @@
 // custom
 #include "common.h"
 
-// make a module that can handle both engine files and onnx model files
-// first, handle onnx models
-// user will point directly to the path of the model
-// currently handle batch size 1
 class TensorRTModule {
  public:
   explicit TensorRTModule(std::string model_path, int batch_size,
@@ -31,7 +27,6 @@ class TensorRTModule {
   bool inference(const std::vector<std::vector<float>> &input);
   const std::vector<float> &get_output(int output_index);
   void save_engine(std::string engine_path);
-  void load_engine();
 
   // get functions
   std::string get_model_path() { return model_path_; }

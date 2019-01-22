@@ -1,7 +1,5 @@
 // STL
-#include <chrono>
 #include <iostream>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,101 +9,73 @@
 // OpenCV
 #include "opencv2/opencv.hpp"
 
+// CXXOPTS
+#include "cxxopts/cxxopts.hpp"
+namespace opt = cxxopts;
+
+struct Onnx2tensorrtConfig {
+  std::string model_path = "model.onnx";
+  std::string output_path = "model.engine";
+  uint32_t batch_size = 1;
+  uint32_t max_workspace = 1 << 20;
+};
+
+Onnx2tensorrtConfig collect_config(const opt::ParseResult &args) {
+  Onnx2tensorrtConfig config;
+  config.model_path = std::string(args["model-path"].as<std::string>());
+  config.output_path = std::string(args["output-path"].as<std::string>());
+  config.batch_size = args["batch-size"].as<uint32_t>();
+  config.max_workspace = args["max-workspace"].as<uint32_t>();
+  return config;
+}
+
+void onnx2tensorrt(const Onnx2tensorrtConfig &config) {
+  TensorRTModule trt_module(config.model_path, config.batch_size,
+                            config.max_workspace);
+  std::cout << "<STATUS> Preparing TensorRT engine for saving now."
+            << std::endl;
+  trt_module.save_engine(config.output_path);
+  return;
+}
+
 int main(int argc, char **argv) {
-  std::string onnx_path = "/home/aaron/Data/onnx_models/resnet50v1.onnx";
-  int batch_size = 1;
-  int max_workspace_size = 1 << 20;
-  TensorRTModule trt_module(onnx_path, batch_size, max_workspace_size);
+  Onnx2tensorrtConfig config;
+  opt::Options options("onnx2tensorrt",
+                       "Serializes an Onnx model into an Nvidia TensorRT "
+                       "engine ready for inference for this machine.");
+  options.add_options()(
+      "model-path", "Path to ONNX model",
+      opt::value<std::string>()->default_value(config.model_path))(
+      "output-path", "Path to save Engine file to",
+      opt::value<std::string>()->default_value(config.output_path))(
+      "batch-size", "Batch size for inference",
+      opt::value<uint32_t>()->default_value(std::to_string(config.batch_size)))(
+      "max-workspace",
+      "Maximum device workspace size in MB for use during optimization",
+      opt::value<uint32_t>()->default_value(
+          std::to_string(config.max_workspace)))(
+      "h, help", "Displays help message and lists arguments",
+      opt::value<std::string>()->default_value("false"));
 
-  // std::string engine_path = "/home/aaron/Data/engines/resnet50v1.engine";
-  // TensorRTModule trt_module(engine_path);
-
-  // prepare data
-  cv::Mat img =
-      cv::imread("/home/aaron/projects/ros2_tensorrt/data/cat_224.jpg",
-                 CV_LOAD_IMAGE_COLOR);
-  cv::Mat float_mat;
-  img.convertTo(float_mat, CV_32FC3, 1.0 / 255.0);
-  cv::Mat resized_mat;
-  cv::resize(float_mat, resized_mat, cv::Size(224, 224), 0, 0,
-             cv::INTER_LINEAR);
-
-  // splitting into BGR channels, then normalize
-  std::vector<cv::Mat> channels;
-  cv::split(resized_mat, channels);
-  // channels[0] = channels[0] - BLUE_CHANNEL_MEAN;
-  // channels[0] = channels[0] / BLUE_CHANNEL_STD;
-  // channels[1] = channels[1] - GREEN_CHANNEL_MEAN;
-  // channels[1] = channels[1] / GREEN_CHANNEL_STD;
-  // channels[2] = channels[2] - RED_CHANNEL_MEAN;
-  // channels[2] = channels[2] / RED_CHANNEL_STD;
-
-  // vectorize
-  cv::Mat vect_mat;
-  vect_mat.push_back(channels[2]);
-  vect_mat.push_back(channels[1]);
-  vect_mat.push_back(channels[0]);
-  vect_mat = vect_mat.reshape(1, 1);
-
-  std::vector<float> tmp_input;
-  tmp_input.assign((float *)vect_mat.datastart, (float *)vect_mat.dataend);
-
-  // cv::Mat test_img;
-
-  // prepare dummy data
-  std::vector<std::vector<float>> dummy_input;
-  dummy_input.push_back(tmp_input);
-
-  // int n_inputs = trt_module.get_n_inputs();
-  // for (int i = 0; i < n_inputs; i++) {
-  //   auto input_dim = trt_module.get_input_dimensions(i);
-  //   std::cout << "Input size is: ";
-  //   for (int j = 0; j < input_dim.nbDims; j++)
-  //     std::cout << input_dim.d[j] << " ";
-  //   std::cout << std::endl;
-
-  //   int64_t curr_input_volume =
-  //       tensorrt_common::volume(trt_module.get_input_dimensions(i));
-  //   std::cout << "Allocating " << curr_input_volume << " for dummy input."
-  //             << std::endl;
-  //   std::vector<float> tmp_input(static_cast<int>(curr_input_volume), 1);
-  //   dummy_input.push_back(tmp_input);
-  // }
-
-  // inference
-  if (!trt_module.inference(dummy_input))
-    std::cout << "Inference failed." << std::endl;
-  int n_outputs = trt_module.get_n_outputs();
-  for (int i = 0; i < n_outputs; i++) {
-    auto output_dim = trt_module.get_output_dimensions(i);
-    std::cout << "Output size is: ";
-    for (int j = 0; j < output_dim.nbDims; j++)
-      std::cout << output_dim.d[j] << " ";
-    std::cout << std::endl;
+  bool help = false;
+  try {
+    auto args = options.parse(argc, argv);
+    if (args["help"].as<std::string>() == "true")
+      help = true;
+    else {
+      Onnx2tensorrtConfig init_config = collect_config(args);
+      onnx2tensorrt(init_config);
+    }
+  } catch (const opt::OptionException &e) {
+    std::cout << "<ERROR> Option exception." << std::endl;
+    help = true;
   }
-  // try to get topK results
-  std::vector<float> output = trt_module.get_output(0);
-  auto top = tensorrt_common::topK<float>(output, 1);
-  std::cout << "Classification is: " << top[0] << std::endl;
 
-  // // timing
-  // auto t0 = std::chrono::system_clock::now();
-  // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
-  //     std::chrono::system_clock::now() - t0);
-  // for (int i = 0; i < 100; i++) {
-  //   if (!trt_module.inference(dummy_input))
-  //     std::cout << "Inference failed." << std::endl;
+  if (help) {
+    std::cout << options.help() << std::endl;
+    return 0;
+  }
 
-  //   // std::vector<float> tmp_output = trt_module.get_output(0);
-  //   auto top = tensorrt_common::topK<float>(trt_module.get_output(0), 1);
-  //   // std::cout << "Classification is: " << top[0] << std::endl;
-
-  //   duration = std::chrono::duration_cast<std::chrono::microseconds>(
-  //       std::chrono::system_clock::now() - t0);
-  //   std::cout << "Inference time: " << static_cast<int>(duration.count())
-  //             << " microseconds: " << top[0] << std::endl;
-  //   t0 = std::chrono::system_clock::now();
-  // }
-
+  std::cout << "<STATUS> Onnx2TensorRT done." << std::endl;
   return 0;
 }

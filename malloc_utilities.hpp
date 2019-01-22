@@ -35,12 +35,12 @@ inline void* device_malloc(size_t size) {
 
 inline void host_pinned_deleter(void* ptr) {
   CHECK(cudaFreeHost(ptr));
-  std::cout << "Host pinned memory freed." << std::endl;
+  std::cout << "<STATUS> Host pinned memory freed." << std::endl;
 }
 
 inline void device_deleter(void* ptr) {
   CHECK(cudaFree(ptr));
-  std::cout << "Device memory freed." << std::endl;
+  std::cout << "<STATUS> Device memory freed." << std::endl;
 };
 
 std::unique_ptr<void, std::function<void(void*)>> cuda_malloc_from_dims(
