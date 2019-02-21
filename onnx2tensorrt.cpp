@@ -35,6 +35,8 @@ void onnx2tensorrt(const Onnx2tensorrtConfig &config) {
   std::cout << "<STATUS> Preparing TensorRT engine for saving now."
             << std::endl;
   trt_module.save_engine(config.output_path);
+  std::cout << "<STATUS> TensorRT engine saved at " << config.output_path
+            << std::endl;
   return;
 }
 

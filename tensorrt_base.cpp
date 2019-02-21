@@ -70,14 +70,12 @@ TensorRTModule::TensorRTModule(std::string model_path, int batch_size,
   trt_context_ =
       tensorrt_common::infer_object(trt_engine_->createExecutionContext());
   CHECK(cudaStreamCreate(&stream_));
-
-  std::cout << "<STATUS> TensorRT module initialization done." << std::endl;
-  std::cout << "<STATUS> Inference can be started now." << std::endl;
 }
 
-TensorRTModule::TensorRTModule(std::string model_path)
+TensorRTModule::TensorRTModule(std::string model_path, int batch_size)
     : model_path_(model_path),
-      model_type_(tensorrt_common::getFileType(model_path)) {
+      model_type_(tensorrt_common::getFileType(model_path)),
+      batch_size_(batch_size) {
   trt_runtime_ =
       tensorrt_common::infer_object(nvinfer1::createInferRuntime(g_logger_));
 
@@ -131,15 +129,9 @@ TensorRTModule::TensorRTModule(std::string model_path)
     engine_smart_mem_.push_back(cuda_malloc_from_dims(curr_dim));
     engine_mem_.push_back(engine_smart_mem_.back().get());
   }
-
-  std::cout << "<STATUS> TensorRT module initialization done." << std::endl;
-  std::cout << "<STATUS> Inference can be started now." << std::endl;
 }
 
-TensorRTModule::~TensorRTModule() {
-  cudaStreamDestroy(stream_);
-  std::cout << "<STATUS> TensorRT module killed safely." << std::endl;
-}
+TensorRTModule::~TensorRTModule() { cudaStreamDestroy(stream_); }
 
 bool TensorRTModule::inference(const std::vector<std::vector<float>>& input) {
   // safety: must be same number of inputs
@@ -187,8 +179,6 @@ void TensorRTModule::save_engine(std::string engine_path) {
   std::ofstream ofs(engine_path, std::ios::out | std::ios::binary);
   ofs.write((char*)(serialized_model->data()), serialized_model->size());
   ofs.close();
-  std::cout << "<STATUS> TensorRT engine saved at path " << engine_path
-            << std::endl;
 }
 
 void print_dims(nvinfer1::Dims dimensions) {

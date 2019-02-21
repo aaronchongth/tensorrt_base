@@ -22,7 +22,7 @@ class TensorRTModule {
  public:
   explicit TensorRTModule(std::string model_path, int batch_size,
                           int max_workspace_size);
-  explicit TensorRTModule(std::string model_path);
+  explicit TensorRTModule(std::string model_path, int batch_size);
   ~TensorRTModule();
   bool inference(const std::vector<std::vector<float>> &input);
   const std::vector<float> &get_output(int output_index);
